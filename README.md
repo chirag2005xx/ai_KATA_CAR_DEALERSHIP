@@ -1,4 +1,4 @@
-# DriveLot — Car Dealership Inventory System
+
 
 # DriveLot — Car Dealership Inventory System
 
