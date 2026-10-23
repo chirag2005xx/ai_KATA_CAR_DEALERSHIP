@@ -3,25 +3,44 @@ import { api, getToken, setToken } from './api'
 import AuthForm from './AuthForm'
 import VehicleForm from './VehicleForm'
 
-const NO_FILTERS = { make: '', model: '', category: '', min_price: '', max_price: '' }
-const FILTER_FIELDS = [
-  ['make', 'text'],
-  ['model', 'text'],
-  ['category', 'text'],
-  ['min_price', 'number'],
-  ['max_price', 'number'],
+const EMPTY_FILTERS = {
+  make: '',
+  model: '',
+  category: '',
+  min_price: '',
+  max_price: '',
+}
+
+const FILTERS = [
+  ['make', 'Make'],
+  ['model', 'Model'],
+  ['category', 'Category'],
+  ['min_price', 'Min price'],
+  ['max_price', 'Max price'],
 ]
+
+const COLORS = [
+  'from-indigo-600 to-violet-700',
+  'from-sky-600 to-indigo-700',
+  'from-emerald-600 to-teal-700',
+  'from-rose-600 to-orange-600',
+]
+
+function colorFor(category = '') {
+  const sum = [...category].reduce((total, char) => total + char.charCodeAt(0), 0)
+  return COLORS[sum % COLORS.length]
+}
 
 export default function App() {
   const [me, setMe] = useState(null)
   const [checking, setChecking] = useState(Boolean(getToken()))
   const [vehicles, setVehicles] = useState([])
-  const [filters, setFilters] = useState(NO_FILTERS)
-  const [form, setForm] = useState(null) // null | 'new' | vehicle object
+  const [filters, setFilters] = useState(EMPTY_FILTERS)
+  const [form, setForm] = useState(null)
   const [error, setError] = useState('')
-  const [tick, setTick] = useState(0)
+  const [refreshKey, setRefreshKey] = useState(0)
 
-  const refresh = () => setTick((t) => t + 1)
+  const refresh = () => setRefreshKey((value) => value + 1)
   const isAdmin = me?.role === 'admin'
 
   const logout = useCallback(() => {
@@ -46,89 +65,146 @@ export default function App() {
 
   useEffect(() => {
     if (!me) return
+
     const timer = setTimeout(async () => {
       try {
-        setVehicles(await api('/api/vehicles/search', { params: filters }))
+        const results = await api('/api/vehicles/search', { params: filters })
+        setVehicles(results)
       } catch (err) {
         if (err.status === 401) logout()
         else setError(err.message)
       }
     }, 250)
-    return () => clearTimeout(timer)
-  }, [me, filters, tick, logout])
 
-  async function run(fn) {
+    return () => clearTimeout(timer)
+  }, [me, filters, refreshKey, logout])
+
+  async function run(action) {
     setError('')
     try {
-      await fn()
+      await action()
     } catch (err) {
       if (err.status === 401) logout()
       else setError(err.message)
     }
   }
 
-  const replace = (u) => setVehicles((vs) => vs.map((x) => (x.id === u.id ? u : x)))
-  const act = (v, action) =>
-    run(async () =>
-      replace(await api(`/api/vehicles/${v.id}/${action}`, { method: 'POST', body: { quantity: 1 } }))
-    )
-  const remove = (v) =>
-    window.confirm(`Delete ${v.make} ${v.model}?`) &&
-    run(async () => {
-      await api(`/api/vehicles/${v.id}`, { method: 'DELETE' })
+  async function changeStock(vehicle, action) {
+    await run(async () => {
+      await api(`/api/vehicles/${vehicle.id}/${action}`, {
+        method: 'POST',
+        body: { quantity: 1 },
+      })
       refresh()
     })
+  }
+
+  async function remove(vehicle) {
+    if (!window.confirm(`Delete ${vehicle.make} ${vehicle.model}?`)) return
+
+    await run(async () => {
+      await api(`/api/vehicles/${vehicle.id}`, { method: 'DELETE' })
+      refresh()
+    })
+  }
 
   async function save(body) {
-    if (form === 'new') await api('/api/vehicles', { method: 'POST', body })
-    else await api(`/api/vehicles/${form.id}`, { method: 'PUT', body })
+    if (form === 'new') {
+      await api('/api/vehicles', { method: 'POST', body })
+    } else {
+      await api(`/api/vehicles/${form.id}`, { method: 'PUT', body })
+    }
     setForm(null)
     refresh()
   }
 
-  if (checking) return <p className="p-6">Loading…</p>
-  if (!me) return <AuthForm onAuth={loadMe} />
+  if (checking) {
+    return <p className="min-h-screen bg-slate-50 p-8">Loading…</p>
+  }
 
-  const btn = 'rounded px-3 py-1.5 text-sm font-medium'
+  if (!me) {
+    return <AuthForm onAuth={loadMe} />
+  }
 
   return (
-    <div className="min-h-screen bg-slate-100">
-      <header className="flex items-center justify-between bg-white px-6 py-3 shadow">
-        <h1 className="text-lg font-bold">Car Dealership</h1>
-        <div className="flex items-center gap-3 text-sm">
-          <span>
-            {me.email}
+    <div className="min-h-screen bg-slate-50">
+      <header className="border-b border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-5 py-4">
+          <div className="text-xl font-black tracking-tight text-slate-900">
+            <span className="mr-2 text-indigo-600">◆</span> DriveLot
+          </div>
+
+          <div className="flex items-center gap-3 text-sm">
+            <span className="hidden text-slate-500 sm:inline">{me.email}</span>
             {isAdmin && (
-              <span className="ml-2 rounded bg-amber-100 px-2 py-0.5 text-amber-800">admin</span>
+              <span className="rounded-full bg-amber-100 px-3 py-1 font-bold text-amber-800">
+                Admin
+              </span>
             )}
-          </span>
-          <button onClick={logout} className="text-blue-600">Log out</button>
+            <button
+              onClick={logout}
+              className="rounded-lg border border-slate-300 px-3 py-2 font-semibold hover:bg-slate-50"
+            >
+              Log out
+            </button>
+          </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl p-6">
-        <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-6">
-          {FILTER_FIELDS.map(([k, type]) => (
+      <main className="mx-auto max-w-6xl px-5 py-8">
+        <section className="relative mb-8 overflow-hidden rounded-3xl bg-gradient-to-r from-slate-950 via-indigo-950 to-indigo-700 p-8 text-white sm:p-10">
+          <div className="relative z-10">
+            <p className="text-xs font-bold uppercase tracking-[0.3em] text-indigo-300">
+              Explore the collection
+            </p>
+            <h1 className="mt-3 text-4xl font-black sm:text-5xl">
+              Find your next drive.
+            </h1>
+            <p className="mt-3 text-indigo-200">
+              Discover, filter, and purchase from our live inventory.
+            </p>
+          </div>
+          <div className="absolute -right-12 -top-20 h-72 w-72 rounded-full bg-indigo-400/20 blur-3xl" />
+        </section>
+
+        <div className="mb-5 flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-2xl font-black">Inventory</h2>
+            <p className="text-sm text-slate-500">
+              {vehicles.length} vehicle{vehicles.length === 1 ? '' : 's'} found
+            </p>
+          </div>
+
+          {isAdmin && (
+            <button
+              onClick={() => setForm('new')}
+              className="rounded-xl bg-indigo-600 px-4 py-2.5 font-bold text-white shadow-lg shadow-indigo-200 hover:bg-indigo-700"
+            >
+              + Add vehicle
+            </button>
+          )}
+        </div>
+
+        <div className="mb-7 grid grid-cols-2 gap-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200 md:grid-cols-6">
+          {FILTERS.map(([key, label]) => (
             <input
-              key={k}
-              type={type}
-              min={type === 'number' ? 0 : undefined}
-              placeholder={k.replace('_', ' ')}
-              value={filters[k]}
-              onChange={(e) => setFilters({ ...filters, [k]: e.target.value })}
-              className="rounded border border-slate-300 bg-white px-3 py-2"
+              key={key}
+              type={key.includes('price') ? 'number' : 'text'}
+              min={key.includes('price') ? 0 : undefined}
+              placeholder={label}
+              value={filters[key]}
+              onChange={(e) => setFilters({ ...filters, [key]: e.target.value })}
+              className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
             />
           ))}
-          <button onClick={() => setFilters(NO_FILTERS)} className={`${btn} bg-slate-200 hover:bg-slate-300`}>
+          <button
+            onClick={() => setFilters(EMPTY_FILTERS)}
+            className="rounded-xl bg-slate-100 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-200"
+          >
             Clear
           </button>
         </div>
 
-        {isAdmin && !form && (
-          <button onClick={() => setForm('new')} className={`${btn} mb-4 bg-green-600 text-white hover:bg-green-700`}>
-            + Add vehicle
-          </button>
-        )}
         {form && (
           <VehicleForm
             key={form === 'new' ? 'new' : form.id}
@@ -138,42 +214,82 @@ export default function App() {
           />
         )}
 
-        {error && <p className="mb-4 rounded bg-red-100 p-3 text-sm text-red-700">{error}</p>}
+        {error && (
+          <p className="mb-5 rounded-xl bg-red-50 p-3 text-sm text-red-700">
+            {error}
+          </p>
+        )}
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {vehicles.map((v) => (
-            <div key={v.id} className="rounded-xl bg-white p-4 shadow">
-              <div className="flex items-start justify-between">
-                <h3 className="font-semibold">{v.make} {v.model}</h3>
-                <span className="rounded bg-slate-100 px-2 py-0.5 text-xs">{v.category}</span>
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {vehicles.map((vehicle) => (
+            <article
+              key={vehicle.id}
+              className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 transition hover:-translate-y-1 hover:shadow-xl"
+            >
+              <div
+                className={`relative flex h-36 items-center justify-center bg-gradient-to-br ${colorFor(vehicle.category)} text-white`}
+              >
+                <span className="text-7xl drop-shadow-lg" aria-hidden="true">🚘</span>
+                <span className="absolute left-4 top-4 rounded-full bg-white/20 px-3 py-1 text-xs font-bold backdrop-blur">
+                  {vehicle.category}
+                </span>
+                <span className="absolute right-4 top-4 rounded-full bg-white/90 px-3 py-1 text-xs font-bold text-slate-800">
+                  {vehicle.stock === 0 ? 'Sold out' : `${vehicle.stock} in stock`}
+                </span>
               </div>
-              <p className="text-sm text-slate-500">{v.year}</p>
-              <p className="mt-2 text-lg font-bold">${Number(v.price).toLocaleString()}</p>
-              <p className={`text-sm ${v.stock === 0 ? 'text-red-600' : 'text-slate-600'}`}>
-                {v.stock === 0 ? 'Out of stock' : `${v.stock} in stock`}
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2">
+
+              <div className="p-5">
+                <div className="flex items-baseline justify-between gap-2">
+                  <h3 className="text-lg font-black">
+                    {vehicle.make} {vehicle.model}
+                  </h3>
+                  <span className="text-sm text-slate-500">{vehicle.year}</span>
+                </div>
+
+                <p className="mt-2 text-2xl font-black text-indigo-600">
+                  ${Number(vehicle.price).toLocaleString()}
+                </p>
+
                 <button
-                  onClick={() => act(v, 'purchase')}
-                  disabled={v.stock === 0}
-                  className={`${btn} bg-blue-600 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300`}
+                  onClick={() => changeStock(vehicle, 'purchase')}
+                  disabled={vehicle.stock === 0}
+                  className="mt-4 w-full rounded-xl bg-indigo-600 px-4 py-2.5 font-bold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
                 >
-                  Purchase
+                  {vehicle.stock === 0 ? 'Out of stock' : 'Purchase'}
                 </button>
+
                 {isAdmin && (
-                  <>
-                    <button onClick={() => act(v, 'restock')} className={`${btn} bg-emerald-100 text-emerald-800`}>
-                      Restock +1
+                  <div className="mt-3 grid grid-cols-3 gap-2">
+                    <button
+                      onClick={() => changeStock(vehicle, 'restock')}
+                      className="rounded-lg bg-emerald-50 px-2 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100"
+                    >
+                      Restock
                     </button>
-                    <button onClick={() => setForm(v)} className={`${btn} bg-slate-100`}>Edit</button>
-                    <button onClick={() => remove(v)} className={`${btn} bg-red-100 text-red-700`}>Delete</button>
-                  </>
+                    <button
+                      onClick={() => setForm(vehicle)}
+                      className="rounded-lg bg-slate-100 px-2 py-2 text-sm font-semibold hover:bg-slate-200"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => remove(vehicle)}
+                      className="rounded-lg bg-red-50 px-2 py-2 text-sm font-semibold text-red-700 hover:bg-red-100"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 )}
               </div>
-            </div>
+            </article>
           ))}
         </div>
-        {vehicles.length === 0 && <p className="text-slate-500">No vehicles found.</p>}
+
+        {vehicles.length === 0 && (
+          <div className="rounded-2xl border-2 border-dashed border-slate-300 bg-white p-12 text-center text-slate-500">
+            No vehicles found. {isAdmin && 'Add one to get started.'}
+          </div>
+        )}
       </main>
     </div>
   )
