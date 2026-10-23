@@ -17,3 +17,14 @@ def test_register_saves_user_and_hides_password(client, engine):
     with engine.connect() as conn:
         emails = conn.execute(text('SELECT email FROM "user"')).scalars().all()
     assert emails == [payload["email"]]
+
+
+def test_register_duplicate_email_returns_409(client):
+    payload = {"email": "chirag@example.com", "password": "correct-horse-battery"}
+
+    first = client.post("/api/auth/register", json=payload)
+    assert first.status_code == 201
+
+    second = client.post("/api/auth/register", json=payload)
+
+    assert second.status_code == 409
