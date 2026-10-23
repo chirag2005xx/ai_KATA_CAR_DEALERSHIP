@@ -36,3 +36,35 @@ def jwt_secret(monkeypatch):
         "JWT_SECRET",
         "test-secret-not-for-production-0123456789abcdef",
     )
+
+from sqlmodel import select
+
+from app.models import User
+
+PASSWORD = "correct-horse-battery"
+
+
+def _login_headers(client, email):
+    r = client.post("/api/auth/login", json={"email": email, "password": PASSWORD})
+    return {"Authorization": f"Bearer {r.json()['access_token']}"}
+
+
+@pytest.fixture
+def user_headers(client):
+    email = "user@example.com"
+    r = client.post("/api/auth/register", json={"email": email, "password": PASSWORD})
+    assert r.status_code == 201
+    return _login_headers(client, email)
+
+
+@pytest.fixture
+def admin_headers(client, engine):
+    email = "admin@example.com"
+    r = client.post("/api/auth/register", json={"email": email, "password": PASSWORD})
+    assert r.status_code == 201
+    with Session(engine) as session:  # promote directly in the test DB
+        user = session.exec(select(User).where(User.email == email)).one()
+        user.role = "admin"
+        session.add(user)
+        session.commit()
+    return _login_headers(client, email)  # log in after promotion

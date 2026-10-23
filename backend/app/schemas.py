@@ -1,4 +1,5 @@
-from sqlmodel import SQLModel
+
+from sqlmodel import Field, SQLModel
 
 
 class UserCreate(SQLModel):
@@ -19,3 +20,4 @@ class LoginRequest(SQLModel):
 class Token(SQLModel):
     access_token: str
     token_type: str = "bearer"
+
