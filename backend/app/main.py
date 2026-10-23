@@ -1,8 +1,28 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from sqlmodel import SQLModel
 
-from app.routers.auth import router as auth_router
-from app.routers.vehicles import router as vehicles_router
+from app import models  # noqa: F401  (registers tables)
+from app.database import engine
+from app.routers import auth, vehicles
 
-app = FastAPI()
-app.include_router(auth_router)
-app.include_router(vehicles_router)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    SQLModel.metadata.create_all(engine)
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(auth.router)
+app.include_router(vehicles.router)
