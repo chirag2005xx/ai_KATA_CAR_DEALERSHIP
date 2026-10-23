@@ -11,6 +11,7 @@ class Vehicle(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     make: str = Field(index=True)
     model: str = Field(index=True)
+    category: str = Field(index=True)
     year: int
     price: float
     stock: int = 0
