@@ -100,7 +100,7 @@ Latest verified backend run: **24 passed, 1 deprecation warning**. See [the test
 
 ![Login](screenshots/login.png)
 
-Remove the login image line if you did not save that screenshot.
+
 
 ## My AI Usage
 
