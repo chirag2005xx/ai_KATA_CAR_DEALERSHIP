@@ -1,6 +1,14 @@
 # DriveLot — Car Dealership Inventory System
 
-A full-stack car inventory application with JWT authentication, searchable vehicles, stock purchases, and admin inventory controls.
+# DriveLot — Car Dealership Inventory System
+
+A car inventory application with JWT authentication, searchable vehicles, stock purchases, and admin inventory controls.
+
+**Live frontend preview:** https://ai-kata-car-dealership.vercel.app/
+
+The React frontend is deployed on Vercel. The FastAPI backend is implemented and tested but **has not been deployed**. The live preview displays the interface; registration, login, inventory, and purchase actions require running the backend locally. Follow the instructions below to use the complete application.
+
+
 
 ## Tech stack
 
