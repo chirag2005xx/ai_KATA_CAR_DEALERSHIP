@@ -28,3 +28,11 @@ def client(engine):
     app.dependency_overrides[get_session] = override_get_session
     yield TestClient(app)
     app.dependency_overrides.clear()
+
+
+@pytest.fixture(autouse=True)
+def jwt_secret(monkeypatch):
+    monkeypatch.setenv(
+        "JWT_SECRET",
+        "test-secret-not-for-production-0123456789abcdef",
+    )
